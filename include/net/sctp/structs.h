@@ -432,7 +432,7 @@ struct sctp_cookie {
 	/* This holds the originating address of the INIT packet.  */
 	union sctp_addr peer_addr;
 
-	/* IG Section 2.35.3 
+	/* IG Section 2.35.3
 	 * Include the source port of the INIT-ACK
 	 */
 	__u16		my_port;
@@ -440,7 +440,7 @@ struct sctp_cookie {
 	__u8 prsctp_capable;
 
 	/* Padding for future use */
-	__u8 padding;  		
+	__u8 padding;
 
 	__u32 adaptation_ind;
 
@@ -554,12 +554,12 @@ static inline __u16 sctp_ssn_next(struct sctp_stream *stream, __u16 id)
 }
 
 /* Skip over this ssn and all below. */
-static inline void sctp_ssn_skip(struct sctp_stream *stream, __u16 id, 
+static inline void sctp_ssn_skip(struct sctp_stream *stream, __u16 id,
 				 __u16 ssn)
 {
 	stream->ssn[id] = ssn+1;
 }
-              
+
 /*
  * Pointers to address related SCTP functions.
  * (i.e. things that depend on the address family.)
@@ -613,7 +613,7 @@ struct sctp_af {
 					    union sctp_addr_param *,
 					    __be16 port, int iif);
 	int		(*to_addr_param) (const union sctp_addr *,
-					  union sctp_addr_param *); 
+					  union sctp_addr_param *);
 	int		(*addr_valid)	(union sctp_addr *,
 					 struct sctp_sock *,
 					 const struct sk_buff *);
@@ -932,6 +932,9 @@ struct sctp_transport {
 
 	/* Which association do we belong to?  */
 	struct sctp_association *asoc;
+
+	/* Do we use a UDP tunnel for encapsulation? */
+	struct sctp_tunnel *tunnel;
 
 	/* RFC2960
 	 *
@@ -1380,7 +1383,7 @@ struct sctp_endpoint {
  	 * 	    on every receive.
  	 */
  	__u8 *digest;
- 
+
 	/* sendbuf acct. policy.	*/
 	__u32 sndbuf_policy;
 

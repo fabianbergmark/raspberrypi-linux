@@ -77,7 +77,7 @@ static struct sctp_association *__sctp_lookup_association(
 					struct sctp_transport **pt);
 
 static int sctp_add_backlog(struct sock *sk, struct sk_buff *skb);
-
+int sctp_rcv_core(struct net *net, struct sk_buff *skb);
 
 /* Calculate the SCTP checksum of an SCTP packet.  */
 static inline int sctp_rcv_checksum(struct sk_buff *skb)
@@ -113,22 +113,15 @@ struct sctp_input_cb {
 };
 #define SCTP_INPUT_CB(__skb)	((struct sctp_input_cb *)&((__skb)->cb[0]))
 
-int sctp_udp_decapsulate(struct sk_buff *skb)
+int sctp_rcv(struct sk_buff *skb)
 {
-	struct udphdr *uh;
-	uh = udp_hdr(skb);
-	if (skb->len < sizeof(struct udphdr))
-		return -1;
-
-	skb_pull(skb, sizeof(struct udphdr));
-	skb_reset_transport_header(skb);
-	return 1;
+	return sctp_rcv_core(dev_net(skb->dev), skb);
 }
 
 /*
  * This is the routine which IP calls when receiving an SCTP packet.
  */
-int sctp_rcv(struct sk_buff *skb)
+int sctp_rcv_core(struct net *net, struct sk_buff *skb)
 {
 	struct sock *sk;
 	struct sctp_association *asoc;
@@ -152,9 +145,6 @@ int sctp_rcv(struct sk_buff *skb)
 
         /* Pull up the IP header. */
 	__skb_pull(skb, skb_transport_offset(skb));
-
-	if (!sctp_udp_decapsulate(skb))
-		goto discard_it;
 
 	sh = sctp_hdr(skb);
 
@@ -476,7 +466,7 @@ void sctp_icmp_proto_unreachable(struct sock *sk,
 						jiffies + (HZ/20)))
 				sctp_association_hold(asoc);
 		}
-			
+
 	} else {
 		if (timer_pending(&t->proto_unreach_timer) &&
 		    del_timer(&t->proto_unreach_timer))
