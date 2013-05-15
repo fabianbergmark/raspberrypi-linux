@@ -64,12 +64,21 @@ static struct sctp_transport *sctp_transport_init(struct net *net,
 						  const union sctp_addr *addr,
 						  gfp_t gfp)
 {
-	/* Copy in the address.  */
+        int ret;
+
+        /* Copy in the address.  */
 	peer->ipaddr = *addr;
 	peer->af_specific = sctp_get_af_specific(addr->sa.sa_family);
 	memset(&peer->saddr, 0, sizeof(union sctp_addr));
 
 	peer->sack_generation = 0;
+
+	/* Setup UDP encapsulating tunnel. */
+
+	SCTP_DEBUG_PRINTK("Creating tunnel");
+	ret = sctp_tunnel_create(net, addr, &peer->tunnel);
+	if (ret < 0)
+		return NULL;
 
 	/* From 6.3.1 RTO Calculation:
 	 *

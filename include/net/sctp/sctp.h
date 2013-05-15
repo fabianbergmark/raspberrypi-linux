@@ -40,7 +40,7 @@
  *    Sridhar Samudrala     <sri@us.ibm.com>
  *    Ardelle Fan           <ardelle.fan@intel.com>
  *    Ryan Layer            <rmlayer@us.ibm.com>
- *    Kevin Gao             <kevin.gao@intel.com> 
+ *    Kevin Gao             <kevin.gao@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -147,9 +147,32 @@ int sctp_primitive_REQUESTHEARTBEAT(struct net *, struct sctp_association *, voi
 int sctp_primitive_ASCONF(struct net *, struct sctp_association *, void *arg);
 
 /*
+ * sctp/encapsulate.c
+ */
+
+enum sctp_encap_type;
+struct sctp_tunnel;
+
+int sctp_tunnel_create(struct net *net, const union sctp_addr *addr, struct sctp_tunnel **tunnelp);
+int sctp_udp_encap_recv(struct sock *sk, struct sk_buff *skb);
+int sctp_udp_decapsulate(struct sk_buff *skb);
+void sctp_udp_encapsulate(struct sk_buff *skb, struct sctp_packet *packet);
+
+enum sctp_encap_type {
+	SCTP_ENCAPTYPE_UDP
+};
+
+struct sctp_tunnel {
+	enum sctp_encap_type encap;
+	struct net  *sctp_net;      /* The net that we belong to */
+	struct sock *sk;            /* Parent socket */
+};
+
+/*
  * sctp/input.c
  */
 int sctp_rcv(struct sk_buff *skb);
+int sctp_rcv_core(struct net *net, struct sk_buff *skb);
 void sctp_v4_err(struct sk_buff *skb, u32 info);
 void sctp_hash_established(struct sctp_association *);
 void sctp_unhash_established(struct sctp_association *);

@@ -74,8 +74,6 @@ static void sctp_packet_append_data(struct sctp_packet *packet,
 static sctp_xmit_t sctp_packet_will_fit(struct sctp_packet *packet,
 					struct sctp_chunk *chunk,
 					u16 chunk_len);
-static void sctp_udp_encapsulate(struct sk_buff *skb,
-				 struct sctp_packet *packet);
 
 static void sctp_packet_reset(struct sctp_packet *packet)
 {
@@ -397,11 +395,12 @@ static void sctp_packet_set_owner_w(struct sk_buff *skb, struct sock *sk)
 int sctp_packet_transmit(struct sctp_packet *packet)
 {
 	struct sctp_transport *tp = packet->transport;
+        struct sctp_tunnel *tunnel = tp->tunnel;
 	struct sctp_association *asoc = tp->asoc;
 	struct sctphdr *sh;
 	struct sk_buff *nskb;
 	struct sctp_chunk *chunk, *tmp;
-	struct sock *sk;
+	struct sock *sk = tunnel->sk;
 	int err = 0;
 	int padding;		/* How much padding do we need?  */
 	__u8 has_data = 0;
@@ -417,7 +416,6 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 
 	/* Set up convenience variables... */
 	chunk = list_entry(packet->chunk_list.next, struct sctp_chunk, list);
-	sk = chunk->skb->sk;
 
 	/* Allocate the new skb.  */
 	nskb = alloc_skb(packet->size + LL_MAX_HEADER, GFP_ATOMIC);
@@ -652,37 +650,6 @@ nomem:
 	goto err;
 }
 
-void sctp_udp_encapsulate(struct sk_buff *skb, struct sctp_packet *packet)
-{
-	struct sock *sk = skb->sk;
-	struct sctp_transport *tp = packet->transport;
-	int len;
-	int offset;
-	struct flowi *fl = &tp->fl;
-	struct flowi4 *fl4 = &(fl->u.ip4);
-	struct udphdr *uh;
-	unsigned int csum;
-
-	/* Build the encapsulating UDP header.
-	 */
-
-	uh = (struct udphdr *)skb_push(skb, sizeof(struct udphdr));
-	skb_reset_transport_header(skb);
-	offset = skb_transport_offset(skb);
-	len = skb->len - offset;
-
-	uh->source = htons(packet->source_port);
-	uh->dest   = htons(packet->destination_port);
-	uh->len    = htons(len);
-	uh->check  = 0;
-
-	/* Calculate checksum
-	 */
-
-	csum = udp_csum(skb);
-	uh->check = csum_tcpudp_magic(fl4->saddr, fl4->daddr,
-	                              len,sk->sk_protocol, csum);
-}
 
 /********************************************************************
  * 2nd Level Abstractions
