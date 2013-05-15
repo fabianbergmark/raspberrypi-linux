@@ -116,6 +116,18 @@ struct sctp_input_cb {
 };
 #define SCTP_INPUT_CB(__skb)	((struct sctp_input_cb *)&((__skb)->cb[0]))
 
+int sctp_udp_decapsulate(struct sk_buff *skb)
+{
+	struct udphdr *uh;
+	uh = udp_hdr(skb);
+	if (skb->len < sizeof(struct udphdr))
+		return -1;
+
+	skb_pull(skb, sizeof(struct udphdr));
+	skb_reset_transport_header(skb);
+	return 1;
+}
+
 /*
  * This is the routine which IP calls when receiving an SCTP packet.
  */
@@ -142,10 +154,14 @@ int sctp_rcv(struct sk_buff *skb)
 	if (skb_linearize(skb))
 		goto discard_it;
 
+        /* Pull up the IP header. */
+	__skb_pull(skb, skb_transport_offset(skb));
+
+	if (!sctp_udp_decapsulate(skb))
+		goto discard_it;
+
 	sh = sctp_hdr(skb);
 
-	/* Pull up the IP and SCTP headers. */
-	__skb_pull(skb, skb_transport_offset(skb));
 	if (skb->len < sizeof(struct sctphdr))
 		goto discard_it;
 	if (!sctp_checksum_disable && !skb_csum_unnecessary(skb) &&
