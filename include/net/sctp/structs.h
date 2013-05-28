@@ -219,7 +219,7 @@ extern struct sctp_globals {
 
 	/* Lock that protects the local_addr_list writers */
 	spinlock_t addr_list_lock;
-	
+
 	/* Flag to indicate if addip is enabled. */
 	int addip_enable;
 	int addip_noauth_enable;
@@ -1088,7 +1088,7 @@ struct sctp_transport {
 	__u64 hb_nonce;
 };
 
-struct sctp_transport *sctp_transport_new(const union sctp_addr *,
+struct sctp_transport *sctp_transport_new(struct sctp_association *, const union sctp_addr *,
 					  gfp_t);
 void sctp_transport_set_owner(struct sctp_transport *,
 			      struct sctp_association *);

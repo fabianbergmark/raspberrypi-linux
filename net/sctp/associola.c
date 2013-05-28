@@ -674,7 +674,8 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 		return peer;
 	}
 
-	peer = sctp_transport_new(addr, gfp);
+	peer = sctp_transport_new(asoc, addr, gfp);
+
 	if (!peer)
 		return NULL;
 

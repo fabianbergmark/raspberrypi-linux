@@ -154,7 +154,7 @@ int sctp_primitive_ASCONF(struct sctp_association *, void *arg);
 enum sctp_encap_type;
 struct sctp_tunnel;
 
-int sctp_tunnel_create(struct net *net, const union sctp_addr *addr, struct sctp_tunnel **tunnelp);
+int sctp_tunnel_create(struct sctp_association *asoc, const union sctp_addr *addr, struct sctp_tunnel **tunnelp);
 int sctp_udp_encap_recv(struct sock *sk, struct sk_buff *skb);
 int sctp_udp_decapsulate(struct sk_buff *skb);
 void sctp_udp_encapsulate(struct sk_buff *skb, struct sctp_packet *packet);
