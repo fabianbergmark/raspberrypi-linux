@@ -67,19 +67,22 @@
 #include <net/net_namespace.h>
 
 /* Forward declarations for internal helpers. */
-static int sctp_tunnel_sock_create(const union sctp_addr *addr,
+static int sctp_tunnel_sock_create(struct sctp_association *asoc,
+                                   const union sctp_addr *addr,
 				   enum sctp_encap_type encap,
 				   struct socket **sockp);
 static inline struct sctp_tunnel *sctp_sock_to_tunnel(struct sock *sk);
 static inline void sctp_skb_set_owner_w(struct sk_buff *skb, struct sock *sk);
 
-static int sctp_tunnel_sock_create(const union sctp_addr *addr,
+static int sctp_tunnel_sock_create(struct sctp_association *asoc,
+                                   const union sctp_addr *addr,
 				   enum sctp_encap_type encap,
 				   struct socket **sockp)
 {
 	int err;
 	struct socket *sock;
 	struct sockaddr_in udp_addr;
+        struct inet_sock *sk = inet_sk(asoc->base.sk);
 
 	switch(encap) {
 	case SCTP_ENCAPTYPE_UDP:
@@ -89,8 +92,14 @@ static int sctp_tunnel_sock_create(const union sctp_addr *addr,
 
 		memset(&udp_addr, 0, sizeof(udp_addr));
 		udp_addr.sin_family = AF_INET;
-		udp_addr.sin_addr = addr->v4.sin_addr;
-		udp_addr.sin_port = addr->v4.sin_port;
+		udp_addr.sin_addr.s_addr = sk->inet_saddr;
+		udp_addr.sin_port = sk->inet_sport;
+
+                SCTP_DEBUG_PRINTK_IPADDR("sctp_tunnel_sock_create: association %p addr:  ",
+                                         " port: %d\n",
+                                         addr,
+                                         addr,
+                                         udp_addr.sin_port);
 
 		err = kernel_bind(sock, (struct sockaddr *) &udp_addr,
 		                  sizeof(udp_addr));
@@ -98,41 +107,46 @@ static int sctp_tunnel_sock_create(const union sctp_addr *addr,
 			goto out;
 
 		udp_addr.sin_family = AF_INET;
-		udp_addr.sin_addr = addr->v4.sin_addr;
-		udp_addr.sin_port = addr->v4.sin_port;
+                udp_addr.sin_addr.s_addr = sk->inet_saddr;
+		udp_addr.sin_port = sk->inet_sport;
 
 		err = kernel_connect(sock, (struct sockaddr *) &udp_addr,
 		                     sizeof(udp_addr), 0);
 		if (err < 0)
 			goto out;
-
 		udp_sk(sock->sk)->encap_type = UDP_ENCAP_SCTPINUDP;
 		udp_sk(sock->sk)->encap_rcv = sctp_udp_encap_recv;
 
 		udp_encap_enable();
-
+                break;
 	default:
 		goto out;
 	}
 
 out:
+        *sockp = sock;
 	if ((err < 0) && sock) {
 		sock_release(sock);
+                *sockp = NULL;
 	}
 	return err;
 }
 
-int sctp_tunnel_create(struct net *net, const union sctp_addr *addr, struct sctp_tunnel **tunnelp)
+int sctp_tunnel_create(struct sctp_association *asoc,
+                       const union sctp_addr *addr,
+                       struct sctp_tunnel **tunnelp)
 {
 	int err;
+
 	struct sock *sk;
 	struct socket *sock;
 	struct sctp_tunnel *tunnel = NULL;
+        struct net *net = sock_net(asoc->base.sk);
 	enum sctp_encap_type encap = SCTP_ENCAPTYPE_UDP;
 
 	SCTP_DEBUG_PRINTK("SCTP: Variable initialization done.");
 
-	err = sctp_tunnel_sock_create(addr, encap, &sock);
+	err = sctp_tunnel_sock_create(asoc, addr, encap, &sock);
 	if (err < 0)
 		goto err;
 
@@ -233,7 +247,8 @@ void sctp_udp_encapsulate(struct sk_buff *skb, struct sctp_packet *packet)
 	int offset;
 	struct flowi *fl = &tp->fl;
 	struct flowi4 *fl4 = &(fl->u.ip4);
-	struct udphdr *uh;
+        struct inet_sock *inet = inet_sk(sk);
+        struct udphdr *uh;
 	unsigned int csum;
 
 	/* Build the encapsulating UDP header.
