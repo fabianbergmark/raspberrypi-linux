@@ -181,6 +181,9 @@ int sctp_tunnel_create(struct sctp_association *asoc,
 	err = 0;
 
 err:
+        *tunnelp = tunnel;
+        if (err < 0)
+          *tunnelp = NULL;
 	return err;
 }
 
