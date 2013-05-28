@@ -1815,6 +1815,10 @@ int udp_lib_setsockopt(struct sock *sk, int level, int optname,
 			up->encap_type = val;
 			udp_encap_enable();
 			break;
+                case UDP_ENCAP_SCTPINUDP:
+                       up->encap_type = val;
+                       udp_encap_enable();
+                       break;
 		default:
 			err = -ENOPROTOOPT;
 			break;
@@ -2339,4 +2343,3 @@ struct sk_buff *udp4_ufo_fragment(struct sk_buff *skb,
 out:
 	return segs;
 }
-
