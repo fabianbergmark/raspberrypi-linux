@@ -241,14 +241,11 @@ inline int sctp_udp_decapsulate(struct sk_buff *skb)
 
 void sctp_udp_encapsulate(struct sk_buff *skb, struct sctp_packet *packet)
 {
+        struct udphdr *uh;
 	struct sock *sk = skb->sk;
-	struct sctp_transport *tp = packet->transport;
+        struct inet_sock *inet = inet_sk(sk);
 	int len;
 	int offset;
-	struct flowi *fl = &tp->fl;
-	struct flowi4 *fl4 = &(fl->u.ip4);
-        struct inet_sock *inet = inet_sk(sk);
-        struct udphdr *uh;
 	unsigned int csum;
 
 	/* Build the encapsulating UDP header.
@@ -266,9 +263,10 @@ void sctp_udp_encapsulate(struct sk_buff *skb, struct sctp_packet *packet)
 	/* Calculate checksum
 	 */
 
-	csum = udp_csum(skb);
-	uh->check = csum_tcpudp_magic(fl4->saddr, fl4->daddr, len,
-	                              sk->sk_protocol, csum);
+	csum = skb_checksum(skb, 0, len, 0);
+	uh->check = csum_tcpudp_magic(inet->inet_saddr
+                                      , inet->inet_daddr
+                                      , len, IPPROTO_UDP, csum);
 
 	sctp_skb_set_owner_w(skb, sk);
 }
