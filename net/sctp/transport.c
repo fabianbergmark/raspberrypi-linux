@@ -60,12 +60,12 @@
 
 /* Initialize a new transport from provided memory.  */
 static struct sctp_transport *sctp_transport_init(struct sctp_transport *peer,
-                                                  struct sctp_association *asoc,
+                                                  struct sock *enc,
 						  const union sctp_addr *addr,
 						  gfp_t gfp)
 {
         int ret;
-        struct net *net = sock_net(asoc->base.sk);
+        struct net *net = sock_net(enc);
 
         /* Copy in the address.  */
 	peer->ipaddr = *addr;
@@ -77,7 +77,7 @@ static struct sctp_transport *sctp_transport_init(struct sctp_transport *peer,
 	/* Setup UDP encapsulating tunnel. */
 
 	SCTP_DEBUG_PRINTK("Creating tunnel");
-	ret = sctp_tunnel_create(asoc, addr, &peer->tunnel);
+	ret = sctp_tunnel_create(enc, addr, &peer->tunnel);
 	if (ret < 0)
 		return NULL;
 
@@ -120,7 +120,7 @@ static struct sctp_transport *sctp_transport_init(struct sctp_transport *peer,
 }
 
 /* Allocate and initialize a new transport.  */
-struct sctp_transport *sctp_transport_new(struct sctp_association *asoc,
+struct sctp_transport *sctp_transport_new(struct sock *enc,
 					  const union sctp_addr *addr,
 					  gfp_t gfp)
 {
@@ -130,8 +130,7 @@ struct sctp_transport *sctp_transport_new(struct sctp_association *asoc,
 	if (!transport)
 		goto fail;
 
-
-	if (!sctp_transport_init(transport, asoc, addr, gfp))
+	if (!sctp_transport_init(transport, enc, addr, gfp))
 		goto fail_init;
 
 	transport->malloced = 1;

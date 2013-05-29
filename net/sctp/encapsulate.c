@@ -67,14 +67,14 @@
 #include <net/net_namespace.h>
 
 /* Forward declarations for internal helpers. */
-static int sctp_tunnel_sock_create(struct sctp_association *asoc,
+static int sctp_tunnel_sock_create(struct sock *sk,
                                    const union sctp_addr *addr,
 				   enum sctp_encap_type encap,
 				   struct socket **sockp);
 static inline struct sctp_tunnel *sctp_sock_to_tunnel(struct sock *sk);
 static inline void sctp_skb_set_owner_w(struct sk_buff *skb, struct sock *sk);
 
-static int sctp_tunnel_sock_create(struct sctp_association *asoc,
+static int sctp_tunnel_sock_create(struct sock *enc,
                                    const union sctp_addr *addr,
 				   enum sctp_encap_type encap,
 				   struct socket **sockp)
@@ -82,7 +82,7 @@ static int sctp_tunnel_sock_create(struct sctp_association *asoc,
 	int err;
 	struct socket *sock;
 	struct sockaddr_in udp_addr;
-        struct inet_sock *sk = inet_sk(asoc->base.sk);
+        struct inet_sock *sk = inet_sk(enc);
 
 	switch(encap) {
 	case SCTP_ENCAPTYPE_UDP:
@@ -132,7 +132,7 @@ out:
 	return err;
 }
 
-int sctp_tunnel_create(struct sctp_association *asoc,
+int sctp_tunnel_create(struct sock *enc,
                        const union sctp_addr *addr,
                        struct sctp_tunnel **tunnelp)
 {
@@ -141,12 +141,12 @@ int sctp_tunnel_create(struct sctp_association *asoc,
 	struct sock *sk;
 	struct socket *sock;
 	struct sctp_tunnel *tunnel = NULL;
-        struct net *net = sock_net(asoc->base.sk);
+        struct net *net = sock_net(enc);
 	enum sctp_encap_type encap = SCTP_ENCAPTYPE_UDP;
 
 	SCTP_DEBUG_PRINTK("SCTP: Variable initialization done.");
 
-	err = sctp_tunnel_sock_create(asoc, addr, encap, &sock);
+	err = sctp_tunnel_sock_create(enc, addr, encap, &sock);
 	if (err < 0)
 		goto err;
 

@@ -5911,7 +5911,8 @@ static struct sctp_packet *sctp_ootb_pkt_new(const struct sctp_association *asoc
 	}
 
 	/* Make a transport for the bucket, Eliza... */
-	transport = sctp_transport_new(sctp_source(chunk), GFP_ATOMIC);
+	transport = sctp_transport_new(asoc->base.sk, sctp_source(chunk), GFP_ATOMIC);
+
 	if (!transport)
 		goto nomem;
 
