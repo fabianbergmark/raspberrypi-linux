@@ -67,22 +67,16 @@
 #include <net/net_namespace.h>
 
 /* Forward declarations for internal helpers. */
-static int sctp_tunnel_sock_create(struct sock *sk,
-                                   const union sctp_addr *addr,
-				   enum sctp_encap_type encap,
+static int sctp_tunnel_sock_create(enum sctp_encap_type encap,
 				   struct socket **sockp);
 static inline struct sctp_tunnel *sctp_sock_to_tunnel(struct sock *sk);
 static inline void sctp_skb_set_owner_w(struct sk_buff *skb, struct sock *sk);
 
-static int sctp_tunnel_sock_create(struct sock *enc,
-                                   const union sctp_addr *addr,
-				   enum sctp_encap_type encap,
+static int sctp_tunnel_sock_create(enum sctp_encap_type encap,
 				   struct socket **sockp)
 {
 	int err;
 	struct socket *sock;
-	struct sockaddr_in udp_addr;
-        struct inet_sock *sk = inet_sk(enc);
 
 	switch(encap) {
 	case SCTP_ENCAPTYPE_UDP:
@@ -90,34 +84,12 @@ static int sctp_tunnel_sock_create(struct sock *enc,
 		if (err < 0)
 			goto out;
 
-		memset(&udp_addr, 0, sizeof(udp_addr));
-		udp_addr.sin_family = AF_INET;
-		udp_addr.sin_addr.s_addr = sk->inet_saddr;
-		udp_addr.sin_port = sk->inet_sport;
-
-                SCTP_DEBUG_PRINTK_IPADDR("sctp_tunnel_sock_create: association %p addr:  ",
-                                         " port: %d\n",
-                                         addr,
-                                         addr,
-                                         udp_addr.sin_port);
-
-		err = kernel_bind(sock, (struct sockaddr *) &udp_addr,
-		                  sizeof(udp_addr));
-		if (err < 0)
-			goto out;
-
-		udp_addr.sin_family = AF_INET;
-                udp_addr.sin_addr.s_addr = sk->inet_saddr;
-		udp_addr.sin_port = sk->inet_sport;
-
-		err = kernel_connect(sock, (struct sockaddr *) &udp_addr,
-		                     sizeof(udp_addr), 0);
-		if (err < 0)
-			goto out;
 		udp_sk(sock->sk)->encap_type = UDP_ENCAP_SCTPINUDP;
 		udp_sk(sock->sk)->encap_rcv = sctp_udp_encap_recv;
 
 		udp_encap_enable();
+
+                SCTP_DEBUG_PRINTK("sctp_tunnel_sock_create: UDP socket created\n");
                 break;
 	default:
 		goto out;
@@ -133,24 +105,19 @@ out:
 }
 
 int sctp_tunnel_create(struct sock *enc,
-                       const union sctp_addr *addr,
                        struct sctp_tunnel **tunnelp)
 {
 	int err;
-
 	struct sock *sk;
 	struct socket *sock;
-	struct sctp_tunnel *tunnel = NULL;
-        struct net *net = sock_net(enc);
+	struct sctp_tunnel *tunnel;
 	enum sctp_encap_type encap = SCTP_ENCAPTYPE_UDP;
 
-	SCTP_DEBUG_PRINTK("SCTP: Variable initialization done.");
-
-	err = sctp_tunnel_sock_create(enc, addr, encap, &sock);
+	err = sctp_tunnel_sock_create(encap, &sock);
 	if (err < 0)
 		goto err;
 
-	SCTP_DEBUG_PRINTK("SCTP: Tunnel sock created");
+        SCTP_DEBUG_PRINTK("sctp_tunnel_create: SCTP tunnel socket created\n");
 
 	sk = sock->sk;
 
@@ -158,23 +125,20 @@ int sctp_tunnel_create(struct sock *enc,
 	tunnel = (struct sctp_tunnel *)sk->sk_user_data;
 	if (tunnel != NULL) {
 		err = -EBUSY;
-		SCTP_DEBUG_PRINTK("SCTP: Already prepped.");
+                SCTP_DEBUG_PRINTK("sctp_tunnel_create: The socket already has a tunnel\n");
 		goto err;
 	}
-
-	SCTP_DEBUG_PRINTK("SCTP: Not already prepped");
 
 	tunnel = kzalloc(sizeof(struct sctp_tunnel), GFP_KERNEL);
 	if (tunnel == NULL) {
 		err = -ENOMEM;
-		SCTP_DEBUG_PRINTK("SCTP: No memory");
+                SCTP_DEBUG_PRINTK("sctp_tunnel_create: Out of memory");
 		goto err;
 	}
 
-	SCTP_DEBUG_PRINTK("SCTP: Allocated memory");
-	tunnel->sctp_net = net;
 	tunnel->encap = encap;
-	tunnel->sk = sk;
+	tunnel->sock = sock;
+        tunnel->sctp_net = sock_net(enc);
 
 	sk->sk_user_data = tunnel;
 	//sk->sk_destruct = &sctp_tunnel_destruct;
@@ -186,6 +150,74 @@ err:
           *tunnelp = NULL;
 	return err;
 }
+
+int sctp_tunnel_connect(struct sctp_tunnel *tunnel,
+                        const union sctp_addr *addr)
+{
+        int err;
+        struct sockaddr_in udp_addr;
+        struct socket *sock = tunnel->sock;
+        struct inet_sock *sk = inet_sk(sock->sk);
+
+        switch(tunnel->encap) {
+        case SCTP_ENCAPTYPE_UDP:
+                memset(&udp_addr, 0, sizeof(udp_addr));
+                udp_addr.sin_family = AF_INET;
+                udp_addr.sin_addr.s_addr = sk->inet_saddr;
+                udp_addr.sin_port = sk->inet_sport;
+
+		err = kernel_connect(sock, (struct sockaddr *) &udp_addr,
+		                     sizeof(udp_addr), 0);
+		if (err < 0)
+			goto out;
+
+                SCTP_DEBUG_PRINTK_IPADDR("sctp_tunnel_connect: association %p addr:  ",
+                                         " port: %d\n",
+                                         addr,
+                                         addr,
+                                         udp_addr.sin_port);
+        default:
+                err = -EINVAL;
+                goto out;
+        }
+out:
+        return err;
+}
+
+int sctp_tunnel_bind(struct sctp_tunnel *tunnel,
+                     const union sctp_addr *addr)
+{
+        int err;
+        struct sockaddr_in udp_addr;
+        struct socket *sock = tunnel->sock;
+        struct inet_sock *sk = inet_sk(sock->sk);
+
+        switch(tunnel->encap) {
+        case SCTP_ENCAPTYPE_UDP:
+                memset(&udp_addr, 0, sizeof(udp_addr));
+                udp_addr.sin_family = AF_INET;
+                udp_addr.sin_addr.s_addr = sk->inet_saddr;
+                udp_addr.sin_port = sk->inet_sport;
+
+                err = kernel_bind(sock, (struct sockaddr *) &udp_addr,
+		                  sizeof(udp_addr));
+		if (err < 0)
+			goto out;
+
+                SCTP_DEBUG_PRINTK_IPADDR("sctp_tunnel_bind: association %p addr:  ",
+                                         " port: %d\n",
+                                         addr,
+                                         addr,
+                                         udp_addr.sin_port);
+        default:
+                err = -EINVAL;
+                goto out;
+
+        }
+out:
+        return err;
+}
+
 
 static inline struct sctp_tunnel *sctp_sock_to_tunnel(struct sock *sk)
 {
@@ -208,6 +240,7 @@ out:
 int sctp_udp_encap_recv(struct sock *udp_sk, struct sk_buff *skb)
 {
 	struct sock * sk;
+        struct socket *sock;
 	struct sctp_tunnel *tunnel;
 
 	tunnel = sctp_sock_to_tunnel(udp_sk);
@@ -215,9 +248,12 @@ int sctp_udp_encap_recv(struct sock *udp_sk, struct sk_buff *skb)
 	if (tunnel == NULL)
 		goto drop;
 
-	sk = tunnel->sk;
-	if (sk == NULL)
+        sock = tunnel->sock;
+
+	if (sock == NULL)
 		goto drop;
+
+        sk = sock->sk;
 
 	if(!sctp_udp_decapsulate(skb))
 		goto drop;

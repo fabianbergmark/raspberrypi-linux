@@ -400,7 +400,7 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 	struct sctphdr *sh;
 	struct sk_buff *nskb;
 	struct sctp_chunk *chunk, *tmp;
-	struct sock *sk = tunnel->sk;
+	struct sock *sk = tunnel->sock->sk;
 	int err = 0;
 	int padding;		/* How much padding do we need?  */
 	__u8 has_data = 0;

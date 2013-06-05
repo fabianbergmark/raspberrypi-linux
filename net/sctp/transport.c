@@ -65,7 +65,9 @@ static struct sctp_transport *sctp_transport_init(struct sctp_transport *peer,
 						  gfp_t gfp)
 {
         int ret;
+        struct sockaddr_in bind_addr;
         struct net *net = sock_net(enc);
+        struct inet_sock *sk = inet_sk(enc);
 
         /* Copy in the address.  */
 	peer->ipaddr = *addr;
@@ -76,10 +78,28 @@ static struct sctp_transport *sctp_transport_init(struct sctp_transport *peer,
 
 	/* Setup UDP encapsulating tunnel. */
 
-	SCTP_DEBUG_PRINTK("Creating tunnel");
-	ret = sctp_tunnel_create(enc, addr, &peer->tunnel);
+	ret = sctp_tunnel_create(enc, &peer->tunnel);
 	if (ret < 0)
 		return NULL;
+
+	SCTP_DEBUG_PRINTK("sctp_transport_init: Created SCTP tunnel\n");
+
+        ret = sctp_tunnel_connect(peer->tunnel, addr);
+        if (ret < 0)
+                return NULL;
+
+        SCTP_DEBUG_PRINTK("sctp_transport_init: Connected SCTP tunnel\n");
+
+        memset(&bind_addr, 0, sizeof(bind_addr));
+        bind_addr.sin_family = AF_INET;
+        bind_addr.sin_addr.s_addr = sk->inet_saddr;
+        bind_addr.sin_port = sk->inet_sport;
+
+        ret = sctp_tunnel_bind(peer->tunnel, addr);
+        if (ret < 0)
+                return NULL;
+
+        SCTP_DEBUG_PRINTK("sctp_transport_init: Bound SCTP tunnel\n");
 
 	/* From 6.3.1 RTO Calculation:
 	 *
