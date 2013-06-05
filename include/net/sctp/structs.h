@@ -75,6 +75,16 @@ union sctp_addr {
 	struct sockaddr sa;
 };
 
+enum sctp_encap_type {
+  SCTP_ENCAPTYPE_UDP
+};
+
+struct sctp_tunnel {
+  enum sctp_encap_type encap;
+  struct socket *sock;          /* UDP socket */
+  struct net *sctp_net;         /* The net that we belong to */
+};
+
 /* Forward declarations for data structures. */
 struct sctp_globals;
 struct sctp_endpoint;
