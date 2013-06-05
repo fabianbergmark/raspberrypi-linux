@@ -159,16 +159,6 @@ int sctp_udp_encap_recv(struct sock *sk, struct sk_buff *skb);
 int sctp_udp_decapsulate(struct sk_buff *skb);
 void sctp_udp_encapsulate(struct sk_buff *skb, struct sctp_packet *packet);
 
-enum sctp_encap_type {
-	SCTP_ENCAPTYPE_UDP
-};
-
-struct sctp_tunnel {
-	enum sctp_encap_type encap;
-	struct net  *sctp_net;      /* The net that we belong to */
-	struct sock *sk;            /* Parent socket */
-};
-
 /*
  * sctp/input.c
  */
