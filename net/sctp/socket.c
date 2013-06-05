@@ -337,6 +337,7 @@ SCTP_STATIC int sctp_do_bind(struct sock *sk, union sctp_addr *addr, int len)
 {
 	struct sctp_sock *sp = sctp_sk(sk);
 	struct sctp_endpoint *ep = sp->ep;
+        struct sctp_tunnel *tunnel = ep->base.tunnel;
 	struct sctp_bind_addr *bp = &ep->base.bind_addr;
 	struct sctp_af *af;
 	unsigned short snum;
@@ -404,6 +405,10 @@ SCTP_STATIC int sctp_do_bind(struct sock *sk, union sctp_addr *addr, int len)
 	 * Use GFP_ATOMIC since BHs will be disabled.
 	 */
 	ret = sctp_add_bind_addr(bp, addr, SCTP_ADDR_SRC, GFP_ATOMIC);
+
+        ret = sctp_tunnel_bind(tunnel, addr);
+
+        SCTP_DEBUG_PRINTK("sctp_do_bind: Bound SCTP tunnel\n");
 
 	/* Copy back into socket for getsockname() use. */
 	if (!ret) {
