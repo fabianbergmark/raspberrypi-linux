@@ -1328,6 +1328,9 @@ struct sctp_ep_common {
 	/* What socket does this endpoint belong to?  */
 	struct sock *sk;
 
+        /* Do we use UDP tunneling for encapsulation? */
+        struct sctp_tunnel *tunnel;
+
 	/* This is where we receive inbound chunks.  */
 	struct sctp_inq	  inqueue;
 
