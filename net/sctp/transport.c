@@ -59,47 +59,21 @@
 /* 1st Level Abstractions.  */
 
 /* Initialize a new transport from provided memory.  */
-static struct sctp_transport *sctp_transport_init(struct sctp_transport *peer,
-                                                  struct sock *enc,
+static struct sctp_transport *sctp_transport_init(struct net *net,
+						  struct sctp_transport *peer,
+						  const union sctp_addr *addr,
+						  gfp_t gfp);
+static struct sctp_transport *sctp_transport_init(struct net *net,
+						  struct sctp_transport *peer,
 						  const union sctp_addr *addr,
 						  gfp_t gfp)
 {
-        int ret;
-        struct sockaddr_in bind_addr;
-        struct net *net = sock_net(enc);
-        struct inet_sock *sk = inet_sk(enc);
-
-        /* Copy in the address.  */
+	/* Copy in the address.  */
 	peer->ipaddr = *addr;
 	peer->af_specific = sctp_get_af_specific(addr->sa.sa_family);
 	memset(&peer->saddr, 0, sizeof(union sctp_addr));
 
 	peer->sack_generation = 0;
-
-	/* Setup UDP encapsulating tunnel. */
-
-	ret = sctp_tunnel_create(enc, &peer->tunnel);
-	if (ret < 0)
-		return NULL;
-
-	SCTP_DEBUG_PRINTK("sctp_transport_init: Created SCTP tunnel\n");
-
-        ret = sctp_tunnel_connect(peer->tunnel, addr);
-        if (ret < 0)
-                return NULL;
-
-        SCTP_DEBUG_PRINTK("sctp_transport_init: Connected SCTP tunnel\n");
-
-        memset(&bind_addr, 0, sizeof(bind_addr));
-        bind_addr.sin_family = AF_INET;
-        bind_addr.sin_addr.s_addr = sk->inet_saddr;
-        bind_addr.sin_port = sk->inet_sport;
-
-        ret = sctp_tunnel_bind(peer->tunnel, addr);
-        if (ret < 0)
-                return NULL;
-
-        SCTP_DEBUG_PRINTK("sctp_transport_init: Bound SCTP tunnel\n");
 
 	/* From 6.3.1 RTO Calculation:
 	 *
@@ -140,7 +114,7 @@ static struct sctp_transport *sctp_transport_init(struct sctp_transport *peer,
 }
 
 /* Allocate and initialize a new transport.  */
-struct sctp_transport *sctp_transport_new(struct sock *enc,
+struct sctp_transport *sctp_transport_new(struct net *net,
 					  const union sctp_addr *addr,
 					  gfp_t gfp)
 {
@@ -150,7 +124,7 @@ struct sctp_transport *sctp_transport_new(struct sock *enc,
 	if (!transport)
 		goto fail;
 
-	if (!sctp_transport_init(transport, enc, addr, gfp))
+	if (!sctp_transport_init(net, transport, addr, gfp))
 		goto fail_init;
 
 	transport->malloced = 1;

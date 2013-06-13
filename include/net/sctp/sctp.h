@@ -158,7 +158,7 @@ int sctp_tunnel_bind(struct sctp_tunnel *tunnel, const union sctp_addr *addr);
 int sctp_tunnel_connect(struct sctp_tunnel *tunnel, const union sctp_addr *addr);
 
 int sctp_udp_encap_recv(struct sock *sk, struct sk_buff *skb);
-int sctp_udp_decapsulate(struct sk_buff *skb);
+int sctp_udp_decapsulate(struct sk_buff *skb, struct sock *sk);
 void sctp_udp_encapsulate(struct sk_buff *skb, struct sctp_packet *packet);
 
 /*

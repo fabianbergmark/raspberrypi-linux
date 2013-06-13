@@ -966,8 +966,9 @@ struct sctp_transport {
 	struct rcu_head rcu;
 };
 
-struct sctp_transport *sctp_transport_new(struct sock *, const union sctp_addr *,
-					  gfp_t);
+struct sctp_transport *sctp_transport_new(struct net *net,
+					  const union sctp_addr *addr,
+					  gfp_t gfp);
 void sctp_transport_set_owner(struct sctp_transport *,
 			      struct sctp_association *);
 void sctp_transport_route(struct sctp_transport *, union sctp_addr *,

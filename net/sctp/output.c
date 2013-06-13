@@ -395,9 +395,9 @@ static void sctp_packet_set_owner_w(struct sk_buff *skb, struct sock *sk)
 int sctp_packet_transmit(struct sctp_packet *packet)
 {
 	struct sctp_transport *tp = packet->transport;
-        struct sctp_tunnel *tunnel = tp->tunnel;
 	struct sctp_association *asoc = tp->asoc;
-	struct sctphdr *sh;
+        struct sctp_tunnel *tunnel = asoc->ep->base.tunnel;
+        struct sctphdr *sh;
 	struct sk_buff *nskb;
 	struct sctp_chunk *chunk, *tmp;
 	struct sock *sk = tunnel->sock->sk;
