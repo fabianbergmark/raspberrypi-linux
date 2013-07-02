@@ -116,8 +116,7 @@ out:
         return err;
 }
 
-int sctp_tunnel_create(struct sock *enc,
-                       struct sctp_tunnel **tunnelp)
+int sctp_tunnel_create(struct sctp_endpoint *ep)
 {
         int err;
         struct sctp_tunnel *tunnel;
@@ -130,8 +129,8 @@ int sctp_tunnel_create(struct sock *enc,
                 goto err;
         }
 
+        tunnel->ep = ep;
         tunnel->encap = encap;
-        tunnel->sctp_net = sock_net(enc);
         err = sctp_tunnel_sock_create(tunnel);
 
         if (err < 0)
@@ -140,12 +139,9 @@ int sctp_tunnel_create(struct sock *enc,
                 goto err;
         }
 
-
         err = 0;
+        ep->base.tunnel = tunnel;
 err:
-        *tunnelp = tunnel;
-        if (err < 0)
-                *tunnelp = NULL;
         return err;
 }
 
@@ -231,7 +227,7 @@ int sctp_udp_encap_recv(struct sock *udp_sk, struct sk_buff *skb)
                           ntohs(inet->inet_dport));
 
 
-        return sctp_rcv_core(tunnel->sctp_net, skb);
+        return sctp_rcv_core(sock_net(tunnel->ep->base.sk), skb);
 
 drop:
         return 0;
