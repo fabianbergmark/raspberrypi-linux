@@ -71,14 +71,6 @@ static struct sctp_endpoint *sctp_endpoint_init(struct sctp_endpoint *ep,
 	struct sctp_shared_key *null_key;
 	int err;
 
-        /* Setup UDP encapsulating socket */
-
-        err = sctp_tunnel_create(sk, &ep->base.tunnel);
-        if (err < 0)
-                return NULL;
-
-        SCTP_DEBUG_PRINTK("sctp_endpoint: Created endpoint tunnel\n");
-
 	ep->digest = kzalloc(SCTP_SIGNATURE_SIZE, gfp);
 	if (!ep->digest)
 		return NULL;
@@ -179,6 +171,15 @@ static struct sctp_endpoint *sctp_endpoint_init(struct sctp_endpoint *ep,
 	 */
 	ep->auth_hmacs_list = auth_hmacs;
 	ep->auth_chunk_list = auth_chunks;
+
+        /* Setup UDP encapsulating socket */
+
+        err = sctp_tunnel_create(ep);
+        if (err < 0)
+          return NULL;
+
+        SCTP_DEBUG_PRINTK("sctp_endpoint: Created endpoint tunnel\n");
+
 
 	return ep;
 

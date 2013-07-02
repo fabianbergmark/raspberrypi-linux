@@ -80,9 +80,9 @@ enum sctp_encap_type {
 };
 
 struct sctp_tunnel {
-  enum sctp_encap_type encap;
-  struct socket *sock;          /* UDP socket */
-  struct net *sctp_net;         /* The net that we belong to */
+        struct socket *sock;                    /* UDP socket */
+        struct sctp_endpoint *ep;               /* The endpoint we belong to */
+        enum sctp_encap_type encap;
 };
 
 /* Forward declarations for data structures. */
