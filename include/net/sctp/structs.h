@@ -83,6 +83,7 @@ struct sctp_tunnel {
         struct socket *sock;                    /* UDP socket */
         struct sctp_endpoint *ep;               /* The endpoint we belong to */
         enum sctp_encap_type encap;
+        void (*old_sk_destruct)(struct sock *);
 };
 
 /* Forward declarations for data structures. */
