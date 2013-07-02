@@ -288,6 +288,12 @@ static void sctp_endpoint_destroy(struct sctp_endpoint *ep)
 	if (ep->base.sk)
 		sock_put(ep->base.sk);
 
+        /* Delete tunnel */
+        if (ep->base.tunnel)
+        {
+                sctp_tunnel_destroy(ep->base.tunnel);
+        }
+
 	/* Finally, free up our memory. */
 	if (ep->base.malloced) {
 		kfree(ep);

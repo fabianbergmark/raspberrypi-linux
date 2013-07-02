@@ -154,6 +154,7 @@ enum sctp_encap_type;
 struct sctp_tunnel;
 
 int sctp_tunnel_create(struct sctp_endpoint *ep);
+int sctp_tunnel_destroy(struct sctp_tunnel *tunnel);
 int sctp_tunnel_bind(struct sctp_tunnel *tunnel, const union sctp_addr *addr);
 int sctp_tunnel_connect(struct sctp_tunnel *tunnel, const union sctp_addr *addr);
 

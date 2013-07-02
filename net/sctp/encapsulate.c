@@ -67,6 +67,7 @@
 #include <net/net_namespace.h>
 
 /* Forward declarations for internal helpers. */
+static void sctp_tunnel_sock_destroy(struct sock *sk);
 static int sctp_tunnel_sock_create(struct sctp_tunnel *tunnel);
 static inline struct sctp_tunnel *sctp_sock_to_tunnel(struct sock *sk);
 static inline void sctp_skb_set_owner_w(struct sk_buff *skb, struct sock *sk);
@@ -108,12 +109,50 @@ static int sctp_tunnel_sock_create(struct sctp_tunnel *tunnel)
 
         tunnel->sock = sock;
         sk->sk_user_data = tunnel;
+        sk->sk_destruct = &sctp_tunnel_sock_destroy;
 out:
         if ((err < 0) && sock) {
-                sock_release(sock);
+                kernel_sock_shutdown(sock, SHUT_RDWR);
+                sk_release_kernel(sock->sk);
                 tunnel->sock = NULL;
         }
         return err;
+}
+
+static void sctp_tunnel_sock_destroy(struct sock *sk)
+{
+        struct socket *sock;
+        struct sctp_tunnel *tunnel;
+
+        tunnel = sk->sk_user_data;
+        if (tunnel == NULL)
+                goto end;
+
+        SCTP_DEBUG_PRINTK("sctp_tunnel_sock_destroy: Destroying tunnel sock.\n");
+
+        switch (tunnel->encap) {
+        case SCTP_ENCAPTYPE_UDP:
+                (udp_sk(sk))->encap_type = 0;
+                (udp_sk(sk))->encap_rcv = NULL;
+                (udp_sk(sk))->encap_destroy = NULL;
+                break;
+        }
+
+        sk->sk_destruct = NULL;
+        sk->sk_destruct = tunnel->old_sk_destruct;
+        sk->sk_user_data = NULL;
+        tunnel->sock = NULL;
+
+        sock = sk->sk_socket;
+
+        if (sock)
+                kernel_sock_shutdown(sock, SHUT_RDWR);
+        sk_release_kernel(sk);
+
+        if (sk->sk_destruct)
+                (*sk->sk_destruct)(sk);
+end:
+        return;
 }
 
 int sctp_tunnel_create(struct sctp_endpoint *ep)
@@ -143,6 +182,20 @@ int sctp_tunnel_create(struct sctp_endpoint *ep)
         ep->base.tunnel = tunnel;
 err:
         return err;
+}
+
+int sctp_tunnel_destroy(struct sctp_tunnel *tunnel)
+{
+
+        SCTP_DEBUG_PRINTK("sctp_tunnel_destroy: Destroying tunnel.\n");
+
+        if (tunnel->sock)
+                sctp_tunnel_sock_destroy(tunnel->sock->sk);
+
+        sctp_endpoint_free(tunnel->ep);
+
+        kfree(tunnel);
+        return 0;
 }
 
 int sctp_tunnel_bind(struct sctp_tunnel *tunnel,
