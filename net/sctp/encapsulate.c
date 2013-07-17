@@ -69,6 +69,7 @@
 /* Forward declarations for internal helpers. */
 static void sctp_tunnel_sock_destroy(struct sock *sk);
 static int sctp_tunnel_sock_create(struct sctp_tunnel *tunnel);
+static inline int sctp_udp_nat(struct sk_buff *skb, struct udphdr *uh);
 static inline struct sctp_tunnel *sctp_sock_to_tunnel(struct sock *sk);
 static inline void sctp_skb_set_owner_w(struct sk_buff *skb, struct sock *sk);
 
@@ -344,6 +345,23 @@ inline int sctp_udp_decapsulate(struct sk_buff *skb, struct sock *sk)
 
         skb_pull(skb, sizeof(struct udphdr));
         skb_reset_transport_header(skb);
+
+        if (!sctp_udp_nat(skb, uh))
+                return -1;
+
+        return 1;
+}
+
+static inline int sctp_udp_nat(struct sk_buff *skb, struct udphdr *uh)
+{
+        struct sctphdr *sh;
+
+        sh = sctp_hdr(skb);
+        sh->source = uh->source;
+
+        sh->checksum = 0;
+        __u32 crc32 = sctp_start_cksum((__u8 *)sh, skb->len);
+        sh->checksum = sctp_end_cksum(crc32);
 
         return 1;
 }
