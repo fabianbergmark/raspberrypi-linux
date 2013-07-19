@@ -358,6 +358,7 @@ static inline int sctp_udp_nat(struct sk_buff *skb, struct udphdr *uh)
 
         sh = sctp_hdr(skb);
         sh->source = uh->source;
+        sh->dest = uh->dest;
 
         sh->checksum = 0;
         __u32 crc32 = sctp_start_cksum((__u8 *)sh, skb->len);
