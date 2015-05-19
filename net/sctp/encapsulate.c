@@ -134,7 +134,6 @@ static void sctp_tunnel_sock_destroy(struct sock *sk)
         case SCTP_ENCAPTYPE_UDP:
                 (udp_sk(sk))->encap_type = 0;
                 (udp_sk(sk))->encap_rcv = NULL;
-                (udp_sk(sk))->encap_destroy = NULL;
                 break;
         }
 
