@@ -69,6 +69,17 @@ union sctp_addr {
 	struct sockaddr sa;
 };
 
+enum sctp_encap_type {
+        SCTP_ENCAPTYPE_UDP
+};
+
+struct sctp_tunnel {
+        struct socket *sock;                    /* UDP socket */
+        struct sctp_endpoint *ep;               /* The endpoint we belong to */
+        enum sctp_encap_type encap;
+        void (*old_sk_destruct)(struct sock *);
+};
+
 /* Forward declarations for data structures. */
 struct sctp_globals;
 struct sctp_endpoint;
@@ -790,6 +801,9 @@ struct sctp_transport {
 	/* Which association do we belong to?  */
 	struct sctp_association *asoc;
 
+        /* Do we use a UDP tunnel for encapsulation? */
+        struct sctp_tunnel *tunnel;
+
 	/* RFC2960
 	 *
 	 * 12.3 Per Transport Address Data
@@ -1166,6 +1180,9 @@ struct sctp_ep_common {
 
 	/* What socket does this endpoint belong to?  */
 	struct sock *sk;
+
+        /* Do we use UDP tunneling for encapsulation? */
+        struct sctp_tunnel *tunnel;
 
 	/* This is where we receive inbound chunks.  */
 	struct sctp_inq	  inqueue;

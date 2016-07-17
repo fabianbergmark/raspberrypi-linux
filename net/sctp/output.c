@@ -45,6 +45,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <net/inet_ecn.h>
+#include <net/udp.h>
 #include <net/ip.h>
 #include <net/icmp.h>
 #include <net/net_namespace.h>
@@ -124,6 +125,7 @@ struct sctp_packet *sctp_packet_init(struct sctp_packet *packet,
 		overhead = sizeof(struct ipv6hdr);
 	}
 	overhead += sizeof(struct sctphdr);
+	overhead += sizeof(struct udphdr);
 	packet->overhead = overhead;
 	sctp_packet_reset(packet);
 	packet->vtag = 0;
@@ -380,10 +382,11 @@ int sctp_packet_transmit(struct sctp_packet *packet, gfp_t gfp)
 {
 	struct sctp_transport *tp = packet->transport;
 	struct sctp_association *asoc = tp->asoc;
+	struct sctp_tunnel *tunnel = asoc->ep->base.tunnel;
 	struct sctphdr *sh;
 	struct sk_buff *nskb;
 	struct sctp_chunk *chunk, *tmp;
-	struct sock *sk;
+	struct sock *sk = tunnel->sock->sk;
 	int err = 0;
 	int padding;		/* How much padding do we need?  */
 	__u8 has_data = 0;
@@ -398,7 +401,6 @@ int sctp_packet_transmit(struct sctp_packet *packet, gfp_t gfp)
 
 	/* Set up convenience variables... */
 	chunk = list_entry(packet->chunk_list.next, struct sctp_chunk, list);
-	sk = chunk->skb->sk;
 
 	/* Allocate the new skb.  */
 	nskb = alloc_skb(packet->size + MAX_HEADER, gfp);
@@ -564,6 +566,8 @@ int sctp_packet_transmit(struct sctp_packet *packet, gfp_t gfp)
 	 * For v4 this all lives somewhere in sk->sk_opt...
 	 */
 
+	sctp_udp_encapsulate(nskb, packet);
+	
 	/* Dump that on IP!  */
 	if (asoc) {
 		asoc->stats.opackets++;

@@ -127,9 +127,25 @@ int sctp_primitive_REQUESTHEARTBEAT(struct net *, struct sctp_association *, voi
 int sctp_primitive_ASCONF(struct net *, struct sctp_association *, void *arg);
 
 /*
+ * sctp/encapsulate.c
+ */
+enum sctp_encap_type;
+struct sctp_tunnel;
+
+int sctp_tunnel_create(struct sctp_endpoint *ep);
+int sctp_tunnel_destroy(struct sctp_tunnel *tunnel);
+int sctp_tunnel_bind(struct sctp_tunnel *tunnel, const union sctp_addr *addr);
+int sctp_tunnel_connect(struct sctp_tunnel *tunnel, const union sctp_addr *addr);
+
+int sctp_udp_encap_recv(struct sock *sk, struct sk_buff *skb);
+int sctp_udp_decapsulate(struct sk_buff *skb, struct sock *sk);
+void sctp_udp_encapsulate(struct sk_buff *skb, struct sctp_packet *packet);
+
+/*
  * sctp/input.c
  */
 int sctp_rcv(struct sk_buff *skb);
+int sctp_rcv_core(struct net *net, struct sk_buff *skb);
 void sctp_v4_err(struct sk_buff *skb, u32 info);
 void sctp_hash_endpoint(struct sctp_endpoint *);
 void sctp_unhash_endpoint(struct sctp_endpoint *);

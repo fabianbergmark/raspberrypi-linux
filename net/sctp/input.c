@@ -74,6 +74,7 @@ static struct sctp_association *__sctp_lookup_association(
 
 static int sctp_add_backlog(struct sock *sk, struct sk_buff *skb);
 
+int sctp_rcv_core(struct net *net, struct sk_buff *skb);
 
 /* Calculate the SCTP checksum of an SCTP packet.  */
 static inline int sctp_rcv_checksum(struct net *net, struct sk_buff *skb)
@@ -101,10 +102,15 @@ struct sctp_input_cb {
 };
 #define SCTP_INPUT_CB(__skb)	((struct sctp_input_cb *)&((__skb)->cb[0]))
 
+int sctp_rcv(struct sk_buff *skb)
+{
+   return sctp_rcv_core(dev_net(skb->dev), skb);
+}
+
 /*
  * This is the routine which IP calls when receiving an SCTP packet.
  */
-int sctp_rcv(struct sk_buff *skb)
+int sctp_rcv_core(struct net *net, struct sk_buff *skb)
 {
 	struct sock *sk;
 	struct sctp_association *asoc;
@@ -117,7 +123,6 @@ int sctp_rcv(struct sk_buff *skb)
 	union sctp_addr dest;
 	int family;
 	struct sctp_af *af;
-	struct net *net = dev_net(skb->dev);
 
 	if (skb->pkt_type != PACKET_HOST)
 		goto discard_it;
@@ -127,10 +132,11 @@ int sctp_rcv(struct sk_buff *skb)
 	if (skb_linearize(skb))
 		goto discard_it;
 
+	/* Pull up the IP header. */
+	__skb_pull(skb, skb_transport_offset(skb));
+		
 	sh = sctp_hdr(skb);
 
-	/* Pull up the IP and SCTP headers. */
-	__skb_pull(skb, skb_transport_offset(skb));
 	if (skb->len < sizeof(struct sctphdr))
 		goto discard_it;
 
