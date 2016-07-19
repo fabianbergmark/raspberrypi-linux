@@ -87,6 +87,8 @@ static struct sctp_transport *sctp_transport_init(struct net *net,
 	INIT_LIST_HEAD(&peer->send_ready);
 	INIT_LIST_HEAD(&peer->transports);
 
+	peer->tunnel = sctp_tunnel_create(net->sctp.ctl_sock);
+
 	setup_timer(&peer->T3_rtx_timer, sctp_generate_t3_rtx_event,
 			(unsigned long)peer);
 	setup_timer(&peer->hb_timer, sctp_generate_heartbeat_event,
@@ -156,7 +158,7 @@ static void sctp_transport_destroy_rcu(struct rcu_head *head)
 	struct sctp_transport *transport;
 
 	transport = container_of(head, struct sctp_transport, rcu);
-
+	
 	dst_release(transport->dst);
 	kfree(transport);
 	SCTP_DBG_OBJCNT_DEC(transport);
@@ -172,6 +174,12 @@ static void sctp_transport_destroy(struct sctp_transport *transport)
 		return;
 	}
 
+	/* Delete tunnel */
+        if (transport->tunnel)
+        {
+                sctp_tunnel_destroy(transport->tunnel);
+        }
+	
 	sctp_packet_free(&transport->packet);
 
 	if (transport->asoc)

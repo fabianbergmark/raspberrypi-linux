@@ -75,7 +75,7 @@ enum sctp_encap_type {
 
 struct sctp_tunnel {
         struct socket *sock;                    /* UDP socket */
-        struct sctp_endpoint *ep;               /* The endpoint we belong to */
+        struct sock *sk;                        /* The SCTP sock we are tunneling */
         enum sctp_encap_type encap;
         void (*old_sk_destruct)(struct sock *);
 };
@@ -1181,9 +1181,6 @@ struct sctp_ep_common {
 	/* What socket does this endpoint belong to?  */
 	struct sock *sk;
 
-        /* Do we use UDP tunneling for encapsulation? */
-        struct sctp_tunnel *tunnel;
-
 	/* This is where we receive inbound chunks.  */
 	struct sctp_inq	  inqueue;
 
@@ -1218,6 +1215,9 @@ struct sctp_ep_common {
 struct sctp_endpoint {
 	/* Common substructure for endpoint and association. */
 	struct sctp_ep_common base;
+
+        /* Do we use UDP tunneling for encapsulation? */
+        struct sctp_tunnel *tunnel;
 
 	/* Associations: A list of current associations and mappings
 	 *	      to the data consumers for each association. This

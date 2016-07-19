@@ -382,12 +382,12 @@ int sctp_packet_transmit(struct sctp_packet *packet, gfp_t gfp)
 {
 	struct sctp_transport *tp = packet->transport;
 	struct sctp_association *asoc = tp->asoc;
-	struct sctp_tunnel *tunnel = asoc->ep->base.tunnel;
+	struct sctp_tunnel *tunnel = tp->tunnel;
 	struct sctphdr *sh;
 	struct sk_buff *nskb;
 	struct sctp_chunk *chunk, *tmp;
 	struct sock *sk = tunnel->sock->sk;
-	int err = 0;
+        int err = 0;
 	int padding;		/* How much padding do we need?  */
 	__u8 has_data = 0;
 	struct dst_entry *dst;

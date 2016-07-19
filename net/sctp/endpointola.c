@@ -166,11 +166,11 @@ static struct sctp_endpoint *sctp_endpoint_init(struct sctp_endpoint *ep,
 
 	/* Setup UDP encapsulating socket */
 
-        err = sctp_tunnel_create(ep);
-        if (err < 0)
-          return NULL;
+        ep->tunnel = sctp_tunnel_create(sk);
+        if (ep->tunnel < 0)
+          goto nomem;
 
-        //SCTP_DEBUG_PRINTK("sctp_endpoint: Created endpoint tunnel\n");
+        pr_debug("sctp_endpoint: Created endpoint tunnel\n");
 	
 	return ep;
 
@@ -285,9 +285,9 @@ static void sctp_endpoint_destroy(struct sctp_endpoint *ep)
 	}
 	
 	/* Delete tunnel */
-        if (ep->base.tunnel)
+        if (ep->tunnel)
         {
-                sctp_tunnel_destroy(ep->base.tunnel);
+                sctp_tunnel_destroy(ep->tunnel);
         }
 
 	kfree(ep);
