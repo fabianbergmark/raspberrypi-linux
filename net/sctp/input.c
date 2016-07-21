@@ -178,9 +178,11 @@ int sctp_rcv_core(struct net *net, struct sk_buff *skb)
 		goto discard_it;
 
 	asoc = __sctp_rcv_lookup(net, skb, &src, &dest, &transport);
+	pr_debug("asoc lookup %p\n", asoc);
 
 	if (!asoc)
 		ep = __sctp_rcv_lookup_endpoint(net, &dest);
+	pr_debug("ep lookup %p\n", ep);
 
 	/* Retrieve the common input handling substructure. */
 	rcvr = asoc ? &asoc->base : &ep->base;
@@ -191,6 +193,7 @@ int sctp_rcv_core(struct net *net, struct sk_buff *skb)
 	 * bound to another interface, via SO_BINDTODEVICE, treat it as OOTB
 	 */
 	if (sk->sk_bound_dev_if && (sk->sk_bound_dev_if != af->skb_iif(skb))) {
+          	pr_debug("received on another interface");
 		if (asoc) {
 			sctp_association_put(asoc);
 			asoc = NULL;

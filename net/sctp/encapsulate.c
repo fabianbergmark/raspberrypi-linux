@@ -246,13 +246,148 @@ out:
         return tunnel;
 }
 
+/*static inline u32 sctp_udp_tunnel_hash_key(const void *data, u32 len, u32 seed)
+{
+	const struct sctp_udp_tunnel_hash_cmp_arg *x = data;
+	const union sctp_addr *paddr = x->paddr;
+	const struct net *net = x->net;
+	u16 lport;
+	u32 addr;
+
+	lport = x->ep ? htons(x->ep->base.bind_addr.port) :
+			x->laddr->v4.sin_port;
+	if (paddr->sa.sa_family == AF_INET6)
+		addr = jhash(&paddr->v6.sin6_addr, 16, seed);
+	else
+		addr = paddr->v4.sin_addr.s_addr;
+
+	return  jhash_3words(addr, ((__u32)paddr->v4.sin_port) << 16 |
+			     (__force __u32)lport, net_hash_mix(net), seed);
+}
+
+static inline u32 sctp_udp_tunnel_hash_obj(const void *data, u32 len, u32 seed)
+{
+	const struct sctp_tunnel *t = data;
+	const union sctp_addr *paddr = &t->ipaddr;
+	const struct net *net = sock_net(t->asoc->base.sk);
+	u16 lport = htons(t->asoc->base.bind_addr.port);
+	u32 addr;
+
+	if (paddr->sa.sa_family == AF_INET6)
+		addr = jhash(&paddr->v6.sin6_addr, 16, seed);
+	else
+		addr = paddr->v4.sin_addr.s_addr;
+
+	return  jhash_3words(addr, ((__u32)paddr->v4.sin_port) << 16 |
+			     (__force __u32)lport, net_hash_mix(net), seed);
+}
+
+
+static inline int sctp_udp_tunnel_hash_cmp(struct rhashtable_compare_arg *arg,
+				const void *ptr)
+{
+	const struct sctp_hash_cmp_arg *x = arg->key;
+	const struct sctp_transport *t = ptr;
+	struct sctp_association *asoc = t->asoc;
+	const struct net *net = x->net;
+
+	if (!sctp_cmp_addr_exact(&t->ipaddr, x->paddr))
+		return 1;
+	if (!net_eq(sock_net(asoc->base.sk), net))
+		return 1;
+	if (x->ep) {
+		if (x->ep != asoc->ep)
+			return 1;
+	} else {
+		if (x->laddr->v4.sin_port != htons(asoc->base.bind_addr.port))
+			return 1;
+		if (!sctp_bind_addr_match(&asoc->base.bind_addr,
+					  x->laddr, sctp_sk(asoc->base.sk)))
+			return 1;
+	}
+
+	return 0;
+	}
+
+static const struct rhashtable_params sctp_udp_tunnel_hash_params = {
+        .head_offset            = offsetof(struct sctp_tunnel, node),
+        .hashfn                 = sctp_udp_tunnel_hash_key,
+        .obj_hashfn             = sctp_udp_tunnel_hash_obj,
+        .obj_cmpfn              = sctp_udp_tunnel_hash_cmp,
+        .automatic_shrinking    = true,
+};
+
+struct sctp_udp_tunnel_hash_cmp_arg {
+        const union sctp_addr           *laddr;
+        const union sctp_addr           *paddr;
+        const struct net                *net;
+};
+
+int sctp_udp_tunnel_hashtable_init(void)
+{
+         return rhashtable_init(&sctp_udp_tunnel_hashtable, &sctp_udp_tunnel_hash_params);
+}
+
+void sctp_udp_tunnel_hashtable_destroy(void)
+{
+	rhashtable_destroy(&sctp_udp_tunnel_hashtable);
+}
+
+void sctp_hash_udp_tunnel(struct sctp_transport *t)
+{
+        struct sctp_udp_tunnel_hash_cmp_arg arg;
+
+        arg.paddr = &t->ipaddr;
+        arg.net   = sock_net(t->asoc->base.sk);
+
+reinsert:
+        if (rhashtable_lookup_insert_key(&sctp_udp_tunnel_hashtable, &arg,
+                                         &t->tunnel->node, sctp_udp_tunnel_hash_params) == -EBUSY)
+                goto reinsert;
+}
+*/
 int sctp_udp_encap_recv(struct sock *udp_sk, struct sk_buff *skb)
 {
+        struct udphdr *uh;
+	struct net *net;
         struct sctp_tunnel *tunnel;
-        struct inet_sock *inet = inet_sk(udp_sk);
+	struct sctp_transport *transport;
+	union sctp_addr src;
+	union sctp_addr dst;
+	uh = NULL;
+	net = dev_net(skb->dev);
+	
+	/*	struct sctp_udp_hash_cmp_arg arg = {
+	  .laddr = laddr,
+	  .paddr = paddr,
+	  .net   = net,
+	};
+	
+        tunnel = rhashtable_lookup_fast(&sctp_udp_tunnel_hashtable, &arg,
+	sctp_udp_tunnel_hash_params);*/
+	 
+	  
+        if (!sctp_udp_decapsulate(skb, udp_sk, &uh))
+        {
+                pr_debug("sctp_udp_encap_recv: Can't decapsulate package, aborting.\n");
+                goto drop_put;
+        }
 
-        tunnel = sctp_sock_to_tunnel(udp_sk);
-
+	src.v4.sin_port = uh->source;
+	memcpy(&src.v4.sin_addr.s_addr, &ip_hdr(skb)->saddr, sizeof(struct in_addr));
+	dst.v4.sin_port = uh->dest;
+	memcpy(&dst.v4.sin_addr.s_addr, &ip_hdr(skb)->daddr, sizeof(struct in_addr));
+	
+	transport = sctp_addrs_lookup_transport(net, &src, &dst);
+	
+	if (transport == NULL) {
+	        pr_debug("sctp_udp_encap_recv: using the endpoint tunnel.\n");
+	        tunnel = sctp_sock_to_tunnel(udp_sk);
+	} else {
+                pr_debug("sctp_udp_encap_recv: using the transport tunnel.\n");
+	        tunnel = transport->tunnel;
+	}
+	
         if (tunnel == NULL)
         {
                 pr_debug("sctp_udp_encap_recv: Can't find tunnel, aborting.\n");
@@ -261,23 +396,12 @@ int sctp_udp_encap_recv(struct sock *udp_sk, struct sk_buff *skb)
 
 	if (tunnel->sk == NULL)
 	{
-	  pr_debug("sctp_udp_encap_recv: Dangling tunnel.\n");
-	  goto drop_put;
+	        pr_debug("sctp_udp_encap_recv: Dangling tunnel.\n");
+		goto drop_put;
 	}
 
-        if (!sctp_udp_decapsulate(skb, udp_sk))
-        {
-                pr_debug("sctp_udp_encap_recv: Can't decapsulate package, aborting.\n");
-                goto drop_put;
-        }
-
-	pr_debug("sctp_udp_encap_recv: Recieved a package on port %d from port %d.\n",
-                          ntohs(inet->inet_sport),
-                          ntohs(inet->inet_dport));
-
-
 	sock_put(udp_sk);
-        return sctp_rcv_core(sock_net(tunnel->sk), skb);
+        return sctp_rcv_core(net, skb);
 drop_put:
 	sock_put(udp_sk);
 drop:
@@ -288,10 +412,9 @@ void sctp_udp_encapsulate(struct sk_buff *skb, struct sctp_packet *packet)
 {
 
         struct sctp_transport *tp = packet->transport;
+
         struct sctp_tunnel *tunnel = tp->tunnel;
         struct sock *sk = tunnel->sock->sk;
-        union sctp_addr *sctp_src = &tp->saddr;
-        union sctp_addr *sctp_dst = &tp->ipaddr;
         int len;
         int offset;
         struct udphdr *uh;
@@ -313,26 +436,25 @@ void sctp_udp_encapsulate(struct sk_buff *skb, struct sctp_packet *packet)
          */
 
         csum = skb_checksum(skb, 0, len, 0);
-        uh->check = csum_tcpudp_magic(sctp_src->v4.sin_addr.s_addr
-                                      , sctp_dst->v4.sin_addr.s_addr
+        uh->check = csum_tcpudp_magic(tp->saddr.v4.sin_addr.s_addr
+                                      , tp->ipaddr.v4.sin_addr.s_addr
                                       , len, IPPROTO_UDP, csum);
 
-        /*SCTP_DEBUG_PRINTK_IPADDR("sctp_udp_encapsulate: association %p src addr:  ",
-                                 " port: %d\n",
-                                 sctp_src,
-                                 sctp_src,
-                                 ntohs(uh->source));*/
+	pr_debug("sctp_udp_encapsulate: packet %p src addr: %pI4 port: %d\n",
+		 packet,
+		 &tp->saddr.v4.sin_addr.s_addr,
+		 ntohs(uh->source));
 
-        /*SCTP_DEBUG_PRINTK_IPADDR("sctp_udp_encapsulate: association %p dst addr:  ",
-                                 " port: %d\n",
-                                 sctp_dst,
-                                 sctp_dst,
-                                 ntohs(uh->dest));*/
+	pr_debug("sctp_udp_encapsulate: packet %p dst addr: %pI4 port: %d\n",
+		 packet,
+		 &tp->ipaddr.v4.sin_addr.s_addr,
+		 ntohs(uh->dest));
+
 	sctp_skb_set_owner_w(skb, sk);
 	
 }
 
-inline int sctp_udp_decapsulate(struct sk_buff *skb, struct sock *sk)
+inline int sctp_udp_decapsulate(struct sk_buff *skb, struct sock *sk, struct udphdr **puh)
 {
         struct udphdr *uh;
 
@@ -340,12 +462,19 @@ inline int sctp_udp_decapsulate(struct sk_buff *skb, struct sock *sk)
         if (skb->len < sizeof(struct udphdr))
                 return -1;
 
+	pr_debug("sctp_udp_decapsulate: Recieved a package on port %pI4:%d from port %pI4:%d\n",
+		 &ip_hdr(skb)->daddr,
+		 ntohs(uh->dest),
+		 &ip_hdr(skb)->saddr,
+		 ntohs(uh->source));
+
         skb_pull(skb, sizeof(struct udphdr));
         skb_reset_transport_header(skb);
 
         if (!sctp_udp_nat(skb, uh))
                 return -1;
 
+	*puh = uh;
         return 1;
 }
 

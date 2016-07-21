@@ -63,6 +63,7 @@
 #include <linux/spinlock.h>
 #include <linux/jiffies.h>
 #include <linux/idr.h>
+#include <linux/udp.h>
 
 #if IS_ENABLED(CONFIG_IPV6)
 #include <net/ipv6.h>
@@ -137,7 +138,7 @@ int sctp_tunnel_destroy(struct sctp_tunnel *tunnel);
 int sctp_tunnel_bind(struct sctp_tunnel *tunnel, const union sctp_addr *addr);
 
 int sctp_udp_encap_recv(struct sock *sk, struct sk_buff *skb);
-int sctp_udp_decapsulate(struct sk_buff *skb, struct sock *sk);
+int sctp_udp_decapsulate(struct sk_buff *skb, struct sock *sk, struct udphdr **puh);
 void sctp_udp_encapsulate(struct sk_buff *skb, struct sctp_packet *packet);
 
 /*
